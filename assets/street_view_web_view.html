@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Street View</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+        height: 100%;
+        width: 100%;
+        overflow: hidden;
+      }
+      #pano {
+        height: 100%;
+        width: 100%;
+        position: absolute;
+        top: 0;
+        left: 0;
+      }
+      
+      .error {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        color: white;
+        font-size: 16px;
+        z-index: 1000;
+        background: rgba(255, 0, 0, 0.7);
+        padding: 20px;
+        border-radius: 10px;
+        text-align: center;
+        max-width: 80%;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="pano"></div>
+    <!-- <div id="loading" class="loading">Yükleniyor...</div> -->
+    <div id="error" class="error" style="display: none"></div>
+
+    <script>
+      let panorama;
+      let marker;
+      let isInitialized = false;
+      let customIconUrl = "";
+      let customIconOptions = {
+        scaledWidth: 40,
+        scaledHeight: 40,
+        anchorX: 0,
+        anchorY: 50,
+      };
+
+      let streetViewOptions = {
+        panControl: true,
+        zoomControl: true,
+        linksControl: true,
+        fullscreenControl: true,
+        motionTrackingControl: true,
+        addressControl: true,
+        showRoadLabels: true,
+        clickToGo: true,
+        scrollwheel: true,
+        disableDefaultUI: false,
+      };
+
+      function showError(message) {
+        const errorDiv = document.getElementById("error");
+        errorDiv.textContent = message;
+        errorDiv.style.display = "block";
+
+        if (window.MessageHandler) {
+          window.MessageHandler.postMessage("Error_" + message);
+        }
+      }
+
+      function setStreetViewOptions(options) {
+        streetViewOptions = { ...streetViewOptions, ...options };
+
+        if (panorama) {
+          panorama.setOptions(streetViewOptions);
+
+          if (
+            options.povHeading !== undefined ||
+            options.povPitch !== undefined ||
+            options.povZoom !== undefined
+          ) {
+            const currentPov = panorama.getPov();
+            panorama.setPov({
+              heading:
+                options.povHeading !== undefined
+                  ? options.povHeading
+                  : currentPov.heading,
+              pitch:
+                options.povPitch !== undefined
+                  ? options.povPitch
+                  : currentPov.pitch,
+              zoom:
+                options.povZoom !== undefined
+                  ? options.povZoom
+                  : currentPov.zoom,
+            });
+          }
+        }
+      }
+
+      function initialize() {
+        try {
+          document.getElementById("error").style.display = "none";
+          isInitialized = true;
+
+          const fenway = { lat: 42.345573, lng: -71.098326 };
+
+          panorama = new google.maps.StreetViewPanorama(
+            document.getElementById("pano"),
+            {
+              position: fenway,
+              pov: { heading: 34, pitch: 10 },
+              zoom: 0,
+              ...streetViewOptions,
+            }
+          );
+
+          panorama.addListener("error", (errorCode) => {
+            console.error("Street View error:", errorCode);
+            showError("Street View yüklenemedi: " + errorCode);
+          });
+
+          panorama.addListener("status_changed", () => {
+            const status = panorama.getStatus();
+            if (status === "OK" && window.MessageHandler) {
+              window.MessageHandler.postMessage("Status_OK");
+            } else if (
+              status !== "OK" &&
+              status !== "UNKNOWN" &&
+              window.MessageHandler
+            ) {
+              window.MessageHandler.postMessage("Status_" + status);
+            }
+          });
+
+
+          if (window.MessageHandler) {
+            window.MessageHandler.postMessage("StreetView_Ready");
+          }
+        } catch (error) {
+          console.error("Initialization error:", error);
+          showError("Başlatma hatası: " + error.message);
+          if (window.MessageHandler) {
+            window.MessageHandler.postMessage("Initialization_Failed");
+          }
+        }
+      }
+
+      function setCustomIcon(
+        svgUrl,
+        scaledWidth,
+        scaledHeight,
+        anchorX,
+        anchorY
+      ) {
+        customIconUrl = svgUrl;
+        customIconOptions = {
+          scaledWidth: scaledWidth || 40,
+          scaledHeight: scaledHeight || 40,
+          anchorX: anchorX || 0,
+          anchorY: anchorY || 50,
+        };
+
+        if (marker && customIconUrl) {
+          marker.setIcon({
+            url: customIconUrl,
+            scaledSize: new google.maps.Size(
+              customIconOptions.scaledWidth,
+              customIconOptions.scaledHeight
+            ),
+            anchor: new google.maps.Point(
+              customIconOptions.anchorX,
+              customIconOptions.anchorY
+            ),
+          });
+        }
+      }
+
+      function addMarker(lat, lng) {
+
+        if (marker) {
+          marker.setMap(null);
+        }
+
+        const position = { lat: parseFloat(lat), lng: parseFloat(lng) };
+        const markerOptions = {
+          position: position,
+          map: panorama,
+          title: "Konum",
+        };
+
+        if (customIconUrl) {
+          markerOptions.icon = {
+            url: customIconUrl,
+            scaledSize: new google.maps.Size(
+              customIconOptions.scaledWidth,
+              customIconOptions.scaledHeight
+            ),
+            anchor: new google.maps.Point(
+              customIconOptions.anchorX,
+              customIconOptions.anchorY
+            ),
+          };
+        }
+
+        marker = new google.maps.Marker(markerOptions);
+
+        if (window.MessageHandler) {
+          window.MessageHandler.postMessage("Marker_Added");
+        }
+      }
+
+      function removeMarker() {
+        if (marker) {
+          marker.setMap(null);
+          marker = null;
+        }
+
+        if (window.MessageHandler) {
+          window.MessageHandler.postMessage("Marker_Removed");
+        }
+      }
+
+      function changeLocation(lat, lng) {
+        if (!isInitialized) {
+          setTimeout(() => changeLocation(lat, lng), 100);
+          return;
+        }
+
+        const newPosition = new google.maps.LatLng(
+          parseFloat(lat),
+          parseFloat(lng)
+        );
+        panorama.setPosition(newPosition);
+
+        if (window.MessageHandler) {
+          window.MessageHandler.postMessage("Location_Updated");
+        }
+      }
+
+      function setApiKey(apiKey) {
+        if (!apiKey) {
+          console.error("❌ API key boş geldi!");
+          showError("API anahtarı bulunamadı");
+          if (window.MessageHandler) {
+            window.MessageHandler.postMessage("API_Load_Failed");
+          }
+          return;
+        }
+
+        const script = document.createElement("script");
+        script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&callback=initialize`;
+        script.async = true;
+        script.defer = true;
+        script.onerror = function () {
+          console.error("❌ Google Maps API yüklenemedi!");
+          showError(
+            "Google Maps API yüklenemedi. API anahtarını kontrol edin."
+          );
+          if (window.MessageHandler) {
+            window.MessageHandler.postMessage("API_Load_Failed");
+          }
+        };
+        document.head.appendChild(script);
+      }
+
+      if (window.MessageHandler) {
+        window.setCustomIcon = setCustomIcon;
+        window.addMarker = addMarker;
+        window.removeMarker = removeMarker;
+        window.setStreetViewOptions = setStreetViewOptions;
+      }
+    </script>
+  </body>
+</html>

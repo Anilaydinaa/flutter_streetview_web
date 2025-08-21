@@ -1,0 +1,16 @@
+# Build artifacts
+/build/
+/.dart_tool/
+/.packages
+/pubspec.lock
+
+# IDE files
+/.idea/
+/*.iml
+.vscode/
+
+# macOS
+*.DS_Store
+
+# Test output
+/test/output/
