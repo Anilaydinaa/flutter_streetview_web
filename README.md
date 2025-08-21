@@ -24,7 +24,6 @@ Google Maps API Key: Obtain from Google Cloud Console. Enable Required APIs: Map
 2. Create a new project or select existing one
 3. Enable these APIs:
    - Maps JavaScript API
-   - Street View Static API
 4. Create credentials (API Key)
 5. Set application restrictions (recommended)
 6. Copy your API key

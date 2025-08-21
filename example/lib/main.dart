@@ -60,8 +60,6 @@ class _StreetViewExampleState extends State<StreetViewExample> {
          markerOptions: const MarkerOptions(
           markerLat: 41.107490,
           markerLng: 29.078115,
-          iconType: MarkerIconType.svg,
-          customIconPath: 'assets/kivo_pic_icon.svg',
           scaledWidth: 48,
           scaledHeight: 48,
           anchorX: 0,
