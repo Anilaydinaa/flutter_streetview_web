@@ -104,7 +104,6 @@ class _FlutterStreetViewState extends State<FlutterStreetView> {
   bool _isLoading = true;
   String? _errorMessage;
   bool _isInitialized = false;
-  bool _isCriticalError = false;
 
   @override
   void initState() {
